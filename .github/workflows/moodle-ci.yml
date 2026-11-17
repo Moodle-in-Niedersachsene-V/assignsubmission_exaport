@@ -88,6 +88,25 @@ jobs:
       - name: Abhaengigkeit block_exaport hinzufuegen
         run: moodle-plugin-ci add-plugin gtn/exaport
 
+      # Voruebergehender Workaround (A2): block_exaport lib/lib.php deklariert
+      # "array $defaultsort = null". PHP 8.4 meldet dafuer eine Deprecation,
+      # und moodle-plugin-ci bricht die Installation bei jeder PHP-Meldung ab.
+      # Der Fehler liegt in block_exaport, nicht in diesem Plugin; an GTN
+      # gemeldet. Sobald GTN "?array" verwendet, laeuft der Schritt ohne
+      # Aenderung durch und kann entfernt werden.
+      - name: block_exaport fuer PHP 8.4 patchen (Workaround)
+        run: |
+          file=$(grep -rl 'function block_exaport_parse_sort' moodle-plugin-ci-plugins --include=lib.php || true)
+          if [ -z "$file" ]; then
+            echo "block_exaport_parse_sort nicht gefunden - Pfad pruefen"; exit 1
+          fi
+          if grep -q ', array \$defaultsort = null' "$file"; then
+            sed -i 's/, array \$defaultsort = null/, ?array $defaultsort = null/' "$file"
+            echo "Gepatcht: $file"
+          else
+            echo "Nicht mehr noetig: block_exaport ist bereits PHP-8.4-sauber"
+          fi
+
       - name: Moodle und Plugin installieren
         run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
         env:
